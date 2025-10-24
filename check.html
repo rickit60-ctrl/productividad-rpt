@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Checklist Pro — RPT</title>
+  <meta name="description" content="App de checklist diaria con progreso, modo oscuro y guardado local. HTML/CSS/JS puro.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f172a;
+      --text:#e2e8f0;
+      --muted:#94a3b8;
+      --border:#1f2937;
+      --brand:#60a5fa;
+      --ok:#10b981; --warn:#f59e0b; --bad:#ef4444;
+    }
+    :root.light{
+      --bg:#f6f7fb; --panel:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e5e7eb; --brand:#2563eb;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+    .title{display:flex;align-items:center;gap:12px}
+    h1{font-size: clamp(1.4rem, 2.5vw, 2rem); margin:0}
+    .badge{font-size:.75rem;background:var(--brand);color:white;padding:4px 10px;border-radius:999px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px}
+    button, .btn{border:1px solid var(--border);background:var(--panel);color:var(--text);padding:10px 14px;border-radius:12px;cursor:pointer}
+    button:hover{outline:2px solid rgba(99,102,241,.25)}
+    .secondary{background:transparent}
+    .brand{background:var(--brand);border-color:transparent;color:#fff}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr}
+    @media(min-width:900px){.grid{grid-template-columns:1.1fr .9fr}}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px}
+    .card h2{margin:0 0 8px;font-size:1.1rem}
+    .muted{color:var(--muted);font-size:.9rem}
+    .list{display:grid;gap:8px;margin-top:10px}
+    .item{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:12px;background:color-mix(in oklab, var(--panel), #000 3%)}
+    .item input[type="text"]{flex:1;background:transparent;border:none;color:var(--text);outline:none;font-size:.98rem}
+    .item.done{opacity:.65}
+    .progress{height:10px;background:color-mix(in oklab, var(--panel), #fff 4%);border:1px solid var(--border);border-radius:999px;overflow:hidden}
+    .progress>div{height:100%;background:var(--ok);width:0%;transition:width .35s ease}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .pill{border:1px solid var(--border);padding:8px 12px;border-radius:999px}
+    .small{font-size:.85rem}
+    .input{width:100%;border:1px solid var(--border);background:transparent;color:var(--text);padding:10px 12px;border-radius:12px}
+    .split{display:grid;grid-template-columns:1fr auto;gap:8px}
+    .footer{margin-top:24px;display:flex;gap:8px;flex-wrap:wrap}
+    .checkbox{width:20px;height:20px}
+    .kpi{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+    .kpi .box{background:color-mix(in oklab, var(--panel), #fff 4%);border:1px solid var(--border);border-radius:12px;padding:12px}
+    .box .val{font-size:1.3rem;font-weight:700}
+    .link{color:var(--brand);text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title">
+        <h1>Checklist Pro — Rutina Diaria</h1>
+        <span class="badge">Offline • Guardado local</span>
+      </div>
+      <div class="toolbar">
+        <button id="toggleTheme" class="secondary" title="Cambiar tema">🌓 Tema</button>
+        <button id="btnResetDia" class="secondary" title="Reiniciar el día">🔄 Reiniciar día</button>
+        <button id="btnExport" class="secondary" title="Exportar datos">⬇️ Exportar</button>
+        <label class="btn secondary" for="importFile" title="Importar datos">⬆️ Importar <input id="importFile" type="file" accept="application/json" hidden></label>
+        <a class="btn brand" href="#" id="btnAyuda">❓ Ayuda</a>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Columna izquierda: Checklist -->
+      <section class="card">
+        <div class="row">
+          <h2>Hoy</h2>
+          <span id="fecha" class="muted"></span>
+        </div>
+        <div class="progress" aria-label="progreso">
+          <div id="bar"></div>
+        </div>
+        <p class="muted small" id="resume"></p>
+        <div class="list" id="list"></div>
+        <div class="split" style="margin-top:12px">
+          <input id="newTask" class="input" placeholder="Añadir actividad personalizada... (Enter para agregar)" />
+          <button id="addTask" class="brand">Agregar</button>
+        </div>
+      </section>
+
+      <!-- Columna derecha: KPIs rápidos -->
+      <section class="card">
+        <h2>Rendimiento rápido</h2>
+        <div class="kpi">
+          <div class="box">
+            <div class="small muted">Java hoy (min)</div>
+            <div class="val" id="javaVal">0</div>
+            <div class="row">
+              <button class="secondary" data-inc="java" data-min="15">+15</button>
+              <button class="secondary" data-inc="java" data-min="30">+30</button>
+              <button class="secondary" data-inc="java" data-min="60">+60</button>
+            </div>
+          </div>
+          <div class="box">
+            <div class="small muted">Inglés hoy (min)</div>
+            <div class="val" id="engVal">0</div>
+            <div class="row">
+              <button class="secondary" data-inc="eng" data-min="15">+15</button>
+              <button class="secondary" data-inc="eng" data-min="30">+30</button>
+              <button class="secondary" data-inc="eng" data-min="60">+60</button>
+            </div>
+          </div>
+          <div class="box">
+            <div class="small muted">Gimnasio</div>
+            <div class="val" id="gymVal">No</div>
+            <div class="row">
+              <button class="secondary" id="toggleGym">Marcar</button>
+              <span class="pill small" id="gymHint">Pendiente</span>
+            </div>
+          </div>
+          <div class="box">
+            <div class="small muted">Oración AM / PM</div>
+            <div class="val" id="prayVal">0/2</div>
+            <div class="row">
+              <button class="secondary" data-pray="am">AM</button>
+              <button class="secondary" data-pray="pm">PM</button>
+              <button class="secondary" id="clrPray">Limpiar</button>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <span class="muted small">Consejo: Regularidad > intensidad. Suma minutos todos los días.</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Configuración rápida</h2>
+      <p class="muted small">Puedes editar los nombres de las tareas directamente. Se guardan en tu navegador.</p>
+      <div class="row">
+        <button id="btnDefault" class="secondary">Restaurar rutina por defecto</button>
+        <a class="link small" href="https://pages.github.com/" target="_blank" rel="noreferrer">Guía GitHub Pages</a>
+      </div>
+    </section>
+
+    <dialog id="dlg" style="padding:0;border:none;border-radius:16px;overflow:hidden;max-width:640px;width:calc(100% - 32px)">
+      <div class="card" style="border:none;border-radius:0">
+        <h2>Cómo usar y publicar</h2>
+        <ol class="small" style="line-height:1.6">
+          <li>Marca/desmarca tareas. Edita cualquier nombre haciendo clic sobre el texto.</li>
+          <li>El estado se guarda automáticamente (localStorage). Se reinicia al cambiar de día.</li>
+          <li>Usa Exportar/Importar para respaldos.</li>
+          <li><b>Publicar en GitHub Pages</b>:
+            <ul>
+              <li>Crea un repo nuevo en GitHub llamado <code>checklist-pro</code>.</li>
+              <li>Sube este archivo como <code>index.html</code>.</li>
+              <li>En el repo: Settings → Pages → Source: <i>Deploy from a branch</i> → main → /root.</li>
+              <li>Tu app quedará en <code>https://tuusuario.github.io/checklist-pro/</code>.</li>
+            </ul>
+          </li>
+        </ol>
+        <div class="row" style="margin-top:8px"><button id="closeDlg" class="brand">Entendido</button></div>
+      </div>
+    </dialog>
+  </div>
+
+  <script>
+    // --------- Estado y utilidades ---------
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+    const todayKey = () => new Date().toISOString().slice(0,10);
+
+    const DEFAULT_TASKS = [
+      { id:'pray-morning', text:'5:30 AM Oración + 1 versículo', done:false },
+      { id:'hiit', text:'5:45–6:30 AM Ejercicio (gimnasio/HIIT)', done:false },
+      { id:'breakfast', text:'6:30 AM Baño + desayuno + audio EN', done:false },
+      { id:'focus-work', text:'9:00–18:00 Trabajo: 1 mejora real', done:false },
+      { id:'dinner', text:'18:30 Cena ligera + 30 min descanso consciente', done:false },
+      { id:'java', text:'19:30–20:30 Programación Java (proyecto)', done:false },
+      { id:'english', text:'20:30–21:00 Inglés ACTIVO (hablar/imitación)', done:false },
+      { id:'pray-night', text:'21:00 Oración + plan del próximo día', done:false },
+      { id:'sleep', text:'21:30 Dormir disciplinadamente', done:false }
+    ];
+
+    const blankDaily = () => ({
+      date: todayKey(),
+      tasks: JSON.parse(JSON.stringify(DEFAULT_TASKS)),
+      minutes: { java:0, eng:0 },
+      gym:false,
+      pray:{ am:false, pm:false }
+    });
+
+    const loadState = () => {
+      const raw = localStorage.getItem('checklist-pro');
+      if(!raw){ return blankDaily(); }
+      try{
+        const obj = JSON.parse(raw);
+        if(obj.date !== todayKey()) return blankDaily();
+        // Merge por si hay nuevas tareas en versiones nuevas
+        const map = new Map(obj.tasks.map(t=>[t.id,t]));
+        DEFAULT_TASKS.forEach(def=>{ if(!map.has(def.id)) obj.tasks.push(def); });
+        return obj;
+      }catch{ return blankDaily(); }
+    }
+
+    let state = loadState();
+
+    const save = () => localStorage.setItem('checklist-pro', JSON.stringify(state));
+
+    // --------- Render ---------
+    const elList = $('#list');
+    const elBar = $('#bar');
+    const elResume = $('#resume');
+
+    function render(){
+      // Fecha
+      $('#fecha').textContent = new Date().toLocaleDateString('es-DO', { weekday:'long', day:'2-digit', month:'long' });
+
+      // Lista
+      elList.innerHTML = '';
+      state.tasks.forEach((t,idx)=>{
+        const row = document.createElement('div');
+        row.className = 'item' + (t.done?' done':'');
+        row.innerHTML = `
+          <input class="checkbox" type="checkbox" ${t.done?'checked':''} aria-label="${t.text}">
+          <input class="txt" type="text" value="${t.text.replaceAll('"','&quot;')}">
+          <button class="secondary del" title="Eliminar">🗑</button>
+        `;
+        const cb = row.querySelector('.checkbox');
+        const txt = row.querySelector('.txt');
+        const del = row.querySelector('.del');
+
+        cb.addEventListener('change',()=>{ t.done = cb.checked; row.classList.toggle('done', t.done); updateProgress(); save(); });
+        txt.addEventListener('input', ()=>{ t.text = txt.value; save(); });
+        del.addEventListener('click',()=>{ state.tasks.splice(idx,1); render(); save(); });
+        elList.appendChild(row);
+      });
+
+      updateProgress();
+
+      // KPIs
+      $('#javaVal').textContent = state.minutes.java;
+      $('#engVal').textContent = state.minutes.eng;
+      $('#gymVal').textContent = state.gym ? 'Sí' : 'No';
+      $('#gymHint').textContent = state.gym ? 'Completado' : 'Pendiente';
+      $('#prayVal').textContent = `${state.pray.am?1:0 + state.pray.pm?1:0}`; // placeholder; recalculamos abajo
+      const prayCount = (state.pray.am?1:0) + (state.pray.pm?1:0);
+      $('#prayVal').textContent = `${prayCount}/2`;
+
+      save();
+    }
+
+    function updateProgress(){
+      const total = state.tasks.length || 1;
+      const done = state.tasks.filter(t=>t.done).length;
+      const pct = Math.round((done/total)*100);
+      elBar.style.width = pct + '%';
+      elResume.textContent = `${done}/${total} completadas — ${pct}%`;
+    }
+
+    // --------- Eventos UI ---------
+    $('#addTask').addEventListener('click', addTask);
+    $('#newTask').addEventListener('keydown', e=>{ if(e.key==='Enter') addTask(); });
+    function addTask(){
+      const val = $('#newTask').value.trim();
+      if(!val) return;
+      state.tasks.push({ id: 't'+crypto.randomUUID().slice(0,8), text: val, done:false });
+      $('#newTask').value='';
+      render();
+    }
+
+    // Incrementos rápidos
+    $$('button[data-inc]').forEach(b=>{
+      b.addEventListener('click',()=>{
+        const key = b.dataset.inc; const min = parseInt(b.dataset.min,10)||0;
+        state.minutes[key] = Math.min(1440, (state.minutes[key]||0)+min);
+        render();
+      });
+    });
+
+    // Gimnasio toggle
+    $('#toggleGym').addEventListener('click', ()=>{ state.gym = !state.gym; render(); });
+
+    // Oración AM/PM
+    $$('button[data-pray]').forEach(b=> b.addEventListener('click', ()=>{ state.pray[b.dataset.pray] = !state.pray[b.dataset.pray]; render(); }));
+    $('#clrPray').addEventListener('click', ()=>{ state.pray = {am:false, pm:false}; render(); });
+
+    // Tema (persistente)
+    const applyTheme = () => { document.documentElement.classList.toggle('light', localStorage.getItem('theme')==='light'); };
+    $('#toggleTheme').addEventListener('click', ()=>{
+      const cur = localStorage.getItem('theme') || 'dark';
+      const next = cur==='dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      applyTheme();
+    });
+    applyTheme();
+
+    // Reiniciar día
+    $('#btnResetDia').addEventListener('click', ()=>{ if(confirm('¿Reiniciar progreso de HOY?')){ state = blankDaily(); render(); }});
+
+    // Exportar / Importar
+    $('#btnExport').addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `checklist-pro-${state.date}.json`;
+      a.click();
+    });
+    $('#importFile').addEventListener('change', async (e)=>{
+      const file = e.target.files?.[0]; if(!file) return;
+      try{
+        const txt = await file.text();
+        const data = JSON.parse(txt);
+        if(!data || !data.tasks) throw new Error('Formato inválido');
+        // Si el import es de otro día, mantenemos la fecha actual pero traemos tareas/config
+        state.tasks = data.tasks.map(t=>({id:t.id||('t'+Math.random().toString(16).slice(2,8)), text:String(t.text||''), done:!!t.done}));
+        state.minutes = { java: data.minutes?.java||0, eng: data.minutes?.eng||0 };
+        state.gym = !!data.gym;
+        state.pray = { am: !!(data.pray?.am), pm: !!(data.pray?.pm) };
+        state.date = todayKey();
+        render();
+        alert('Datos importados.');
+      }catch(err){ alert('No se pudo importar: '+err.message); }
+      e.target.value = '';
+    });
+
+    // Defaults
+    $('#btnDefault').addEventListener('click', ()=>{
+      if(!confirm('Restaurar la rutina por defecto?')) return;
+      state.tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
+      render();
+    });
+
+    // Ayuda (diálogo)
+    const dlg = $('#dlg');
+    $('#btnAyuda').addEventListener('click', (e)=>{ e.preventDefault(); dlg.showModal(); });
+    $('#closeDlg').addEventListener('click', ()=> dlg.close());
+
+    // Render inicial
+    render();
+  </script>
+</body>
+</html>
